@@ -1,29 +1,38 @@
-import { BaseEdge, getSmoothStepPath, type EdgeProps } from "reactflow";
+import { BaseEdge, getSmoothStepPath, useStore, type EdgeProps, type ReactFlowState } from "reactflow";
 
 // Cuando dos nodos casi se alinean pero difieren por unos pocos px (por
-// redondeo de layout, tamanos distintos, o arrastre manual), el cable en step
-// dibuja un salto en vez de una linea recta. Si la diferencia es chica,
-// forzamos el mismo eje en origen y destino para que el tramo salga recto.
+// redondeo de layout o tamanos distintos), el cable en step dibuja un salto
+// en vez de una linea recta. Si la diferencia es chica, forzamos el mismo eje
+// en origen y destino para que el tramo salga recto. Nunca mientras se esta
+// arrastrando un nodo: el handle real queda en su posicion sin forzar, y
+// forzar el otro extremo dejaria el cable "colgando" separado del nodo.
 const SNAP_PX = 6;
 
 export default function SnappedStepEdge(props: EdgeProps) {
-  const { sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd } = props;
+  const { source, target, sourceX, sourceY, targetX, targetY, sourcePosition, targetPosition, style, markerEnd } =
+    props;
 
-  let sx = sourceX;
-  let sy = sourceY;
+  const isEndpointDragging = useStore((s: ReactFlowState) => {
+    const src = s.nodeInternals.get(source);
+    const tgt = s.nodeInternals.get(target);
+    return !!(src?.dragging || tgt?.dragging);
+  });
+
   let tx = targetX;
   let ty = targetY;
 
-  const horizontal = sourcePosition === "left" || sourcePosition === "right";
-  if (horizontal && Math.abs(sourceY - targetY) <= SNAP_PX) {
-    ty = sourceY;
-  } else if (!horizontal && Math.abs(sourceX - targetX) <= SNAP_PX) {
-    tx = sourceX;
+  if (!isEndpointDragging) {
+    const horizontal = sourcePosition === "left" || sourcePosition === "right";
+    if (horizontal && Math.abs(sourceY - targetY) <= SNAP_PX) {
+      ty = sourceY;
+    } else if (!horizontal && Math.abs(sourceX - targetX) <= SNAP_PX) {
+      tx = sourceX;
+    }
   }
 
   const [path] = getSmoothStepPath({
-    sourceX: sx,
-    sourceY: sy,
+    sourceX,
+    sourceY,
     sourcePosition,
     targetX: tx,
     targetY: ty,
