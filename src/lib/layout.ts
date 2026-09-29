@@ -66,6 +66,56 @@ function measureNode(n: Node): { width: number; height: number } {
   return { width: box.width, height };
 }
 
+// En una cadena recta (un solo cable de entrada y uno de salida) dagre no
+// garantiza que los centros de los nodos coincidan en el eje perpendicular al
+// flujo, porque cada nodo mide distinto. Esa diferencia de pocos px hace que
+// el cable en step dibuje un "salto" en vez de ir recto. Alineamos el centro
+// de cada nodo en cadena recta con el de su predecesor.
+function alignStraightChains(
+  g: dagre.graphlib.Graph,
+  nodes: Node[],
+  edges: Edge[],
+  axis: "x" | "y"
+): Map<string, number> {
+  const outgoing = new Map<string, Edge[]>();
+  const incoming = new Map<string, Edge[]>();
+  nodes.forEach((n) => {
+    outgoing.set(n.id, []);
+    incoming.set(n.id, []);
+  });
+  edges.forEach((e) => {
+    if (!outgoing.has(e.source) || !incoming.has(e.target)) return;
+    outgoing.get(e.source)!.push(e);
+    incoming.get(e.target)!.push(e);
+  });
+
+  const centers = new Map<string, number>();
+  nodes.forEach((n) => {
+    const pos = g.node(n.id);
+    if (pos) centers.set(n.id, pos[axis]);
+  });
+
+  const visited = new Set<string>();
+  const queue = nodes.filter((n) => (incoming.get(n.id)?.length ?? 0) !== 1).map((n) => n.id);
+
+  while (queue.length) {
+    const id = queue.shift()!;
+    if (visited.has(id)) continue;
+    visited.add(id);
+    const outs = outgoing.get(id) ?? [];
+    if (outs.length === 1) {
+      const targetId = outs[0].target;
+      const isSimpleTarget = (incoming.get(targetId)?.length ?? 0) === 1;
+      if (isSimpleTarget && centers.has(id)) {
+        centers.set(targetId, centers.get(id)!);
+      }
+    }
+    outs.forEach((e) => queue.push(e.target));
+  }
+
+  return centers;
+}
+
 export function layoutNodes(nodes: Node[], edges: Edge[], mode: LayoutMode = "horizontal"): Node[] {
   const { rankdir, nodesep, ranksep } = MODE_CONFIG[mode];
   const g = new dagre.graphlib.Graph();
@@ -85,13 +135,18 @@ export function layoutNodes(nodes: Node[], edges: Edge[], mode: LayoutMode = "ho
 
   dagre.layout(g);
 
+  const crossAxis = rankdir === "LR" ? "y" : "x";
+  const alignedCenters = alignStraightChains(g, nodes, edges, crossAxis);
+
   return nodes.map((n) => {
     const pos = g.node(n.id);
     const size = sizes.get(n.id)!;
     if (!pos) return n;
+    const x = crossAxis === "x" ? alignedCenters.get(n.id) ?? pos.x : pos.x;
+    const y = crossAxis === "y" ? alignedCenters.get(n.id) ?? pos.y : pos.y;
     return {
       ...n,
-      position: { x: pos.x - size.width / 2, y: pos.y - size.height / 2 },
+      position: { x: x - size.width / 2, y: y - size.height / 2 },
     };
   });
 }

@@ -7,6 +7,8 @@ interface Props {
   onExport: () => void;
   onImport: (file: File) => void;
   onAutoLayout: (mode: LayoutMode) => void;
+  colorEdgesEnabled: boolean;
+  onToggleColorEdges: () => void;
 }
 
 const NODE_TOOLS: { key: string; kind: NodeKind; label: string; color: string; bg: string }[] = [
@@ -22,7 +24,14 @@ const LAYOUT_MODES: { mode: LayoutMode; label: string; hint: string }[] = [
   { mode: "compact", label: "Compacto", hint: "horizontal, menos espacio entre nodos" },
 ];
 
-export default function Toolbar({ onAddNode, onExport, onImport, onAutoLayout }: Props) {
+export default function Toolbar({
+  onAddNode,
+  onExport,
+  onImport,
+  onAutoLayout,
+  colorEdgesEnabled,
+  onToggleColorEdges,
+}: Props) {
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const layoutMenuRef = useRef<HTMLDivElement>(null);
 
@@ -179,6 +188,22 @@ export default function Toolbar({ onAddNode, onExport, onImport, onAutoLayout }:
           </div>
         )}
       </div>
+
+      <button
+        onClick={onToggleColorEdges}
+        title="Colorear cada hilo de cables con un color distinto"
+        style={{
+          padding: "6px 12px",
+          border: `1px solid ${colorEdgesEnabled ? "var(--ink)" : "var(--line)"}`,
+          borderRadius: 6,
+          background: colorEdgesEnabled ? "var(--ink)" : "var(--surface)",
+          color: colorEdgesEnabled ? "var(--surface)" : "var(--ink)",
+          cursor: "pointer",
+          fontSize: 13,
+        }}
+      >
+        Colorear cables
+      </button>
 
       <span style={{ flex: 1 }} />
 

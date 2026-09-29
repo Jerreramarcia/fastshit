@@ -19,12 +19,16 @@ import ActionNode from "./nodes/ActionNode";
 import BlockerNode from "./nodes/BlockerNode";
 import ConditionalNode from "./nodes/ConditionalNode";
 import PageNode from "./nodes/PageNode";
+import SnappedStepEdge from "./edges/SnappedStepEdge";
 import Toolbar from "./Toolbar";
 import SheetTabs from "./SheetTabs";
 import type { Branch, ExportedBundle, NodeKind } from "../lib/graphTypes";
 import { toExportedSheet, toMarkdown } from "../lib/exportDoc";
 import { layoutNodes, type LayoutMode } from "../lib/layout";
 import { downloadText, readJsonFile } from "../lib/fileIO";
+import { computeEdgeColors } from "../lib/edgeColors";
+
+const COLOR_EDGES_STORAGE_KEY = "fastshit.colorEdgesEnabled";
 
 interface Sheet {
   id: string;
@@ -164,6 +168,18 @@ function FlowCanvasInner() {
   const [activeSheetId, setActiveSheetId] = useState(() => sheets[0].id);
   const [pendingConnection, setPendingConnection] = useState<PendingConnection | null>(null);
   const [layoutAnimating, setLayoutAnimating] = useState(false);
+  const [colorEdgesEnabled, setColorEdgesEnabled] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(COLOR_EDGES_STORAGE_KEY) === "1";
+  });
+
+  function toggleColorEdges() {
+    setColorEdgesEnabled((prev) => {
+      const next = !prev;
+      window.localStorage.setItem(COLOR_EDGES_STORAGE_KEY, next ? "1" : "0");
+      return next;
+    });
+  }
   const connectStartRef = useRef<{ nodeId: string | null; handleId: string | null } | null>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
 
@@ -298,6 +314,7 @@ function FlowCanvasInner() {
     () => ({ action: ActionNode, blocker: BlockerNode, conditional: ConditionalNode, page: PageNode }),
     []
   );
+  const edgeTypes = useMemo(() => ({ snappedStep: SnappedStepEdge }), []);
 
   function branchCallbacks(sheetId: string, nodeId: string) {
     return {
@@ -355,6 +372,16 @@ function FlowCanvasInner() {
   }
 
   const displayNodes = activeSheet.nodes.map((n) => withCallbacks(activeSheet.id, n));
+
+  const displayEdges = useMemo(() => {
+    if (!colorEdgesEnabled) return activeSheet.edges;
+    const colors = computeEdgeColors(activeSheet.nodes, activeSheet.edges);
+    return activeSheet.edges.map((e) => {
+      const color = colors[e.id];
+      if (!color) return e;
+      return { ...e, style: { ...e.style, stroke: color, strokeWidth: 2 } };
+    });
+  }, [activeSheet.nodes, activeSheet.edges, colorEdgesEnabled]);
 
   function onNodesChange(changes: NodeChange[]) {
     const sheetId = activeSheet.id;
@@ -527,14 +554,21 @@ function FlowCanvasInner() {
 
   return (
     <div style={{ display: "flex", flexDirection: "column", height: "100%" }}>
-      <Toolbar onAddNode={addNode} onExport={handleExport} onImport={handleImport} onAutoLayout={autoLayout} />
+      <Toolbar
+        onAddNode={addNode}
+        onExport={handleExport}
+        onImport={handleImport}
+        onAutoLayout={autoLayout}
+        colorEdgesEnabled={colorEdgesEnabled}
+        onToggleColorEdges={toggleColorEdges}
+      />
       <div
         className={layoutAnimating ? "layout-animate" : undefined}
         style={{ flex: 1, position: "relative", minHeight: 0 }}
       >
         <ReactFlow
           nodes={displayNodes}
-          edges={activeSheet.edges}
+          edges={displayEdges}
           onNodesChange={onNodesChange}
           onEdgesChange={onEdgesChange}
           onConnect={onConnect}
@@ -542,10 +576,11 @@ function FlowCanvasInner() {
           onConnectEnd={onConnectEnd}
           onPaneContextMenu={onPaneContextMenu}
           nodeTypes={nodeTypes}
+          edgeTypes={edgeTypes}
           selectionKeyCode="Control"
           multiSelectionKeyCode="Shift"
           deleteKeyCode={null}
-          defaultEdgeOptions={{ type: "smoothstep", style: { stroke: "#8b97a3", strokeWidth: 1.6 } }}
+          defaultEdgeOptions={{ type: "snappedStep", style: { stroke: "#8b97a3", strokeWidth: 1.6 } }}
           fitView
         >
           <Background id={backgroundId} color="#c3cac9" gap={18} size={1.4} />
