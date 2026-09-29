@@ -1,0 +1,65 @@
+:root {
+  --paper: #eef1f0;
+  --surface: #ffffff;
+  --ink: #182027;
+  --ink-soft: #5b6570;
+  --line: #d7dcdb;
+  --line-soft: #e4e8e7;
+
+  --action: #2a5cd6;
+  --action-bg: #eaf0fd;
+  --blocker: #b4650a;
+  --blocker-bg: #fbf1e3;
+  --conditional: #7a3fe0;
+  --conditional-bg: #f2ecfc;
+  --page: #0f8a6a;
+  --page-bg: #e6f5f0;
+
+  --sans: "IBM Plex Sans", system-ui, "Segoe UI", sans-serif;
+  --mono: "IBM Plex Mono", ui-monospace, Consolas, monospace;
+
+  color-scheme: light;
+  font-synthesis: none;
+  text-rendering: optimizeLegibility;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+  margin: 0;
+}
+
+body {
+  font: 400 14px/1.5 var(--sans);
+  color: var(--ink);
+  background: var(--paper);
+  letter-spacing: -0.1px;
+}
+
+button {
+  font-family: var(--sans);
+}
+
+button:focus-visible,
+[tabindex]:focus-visible,
+input:focus-visible {
+  outline: 2px solid var(--action);
+  outline-offset: 2px;
+}
+
+.layout-animate .react-flow__node {
+  transition: transform 320ms cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .layout-animate .react-flow__node {
+    transition: none;
+  }
+}
