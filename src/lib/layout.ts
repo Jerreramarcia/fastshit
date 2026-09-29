@@ -7,7 +7,7 @@ const NODE_HEIGHT = 90;
 export function layoutNodes(nodes: Node[], edges: Edge[]): Node[] {
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "LR", nodesep: 40, ranksep: 90 });
+  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 110, acyclicer: "greedy" });
 
   for (const n of nodes) {
     g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });

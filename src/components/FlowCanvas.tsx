@@ -545,7 +545,7 @@ function FlowCanvasInner() {
           selectionKeyCode="Control"
           multiSelectionKeyCode="Shift"
           deleteKeyCode={null}
-          defaultEdgeOptions={{ style: { stroke: "#8b97a3", strokeWidth: 1.6 } }}
+          defaultEdgeOptions={{ type: "smoothstep", style: { stroke: "#8b97a3", strokeWidth: 1.6 } }}
           fitView
         >
           <Background id={backgroundId} color="#c3cac9" gap={18} size={1.4} />
