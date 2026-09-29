@@ -23,7 +23,7 @@ import Toolbar from "./Toolbar";
 import SheetTabs from "./SheetTabs";
 import type { Branch, ExportedBundle, NodeKind } from "../lib/graphTypes";
 import { toExportedSheet, toMarkdown } from "../lib/exportDoc";
-import { layoutNodes } from "../lib/layout";
+import { layoutNodes, type LayoutMode } from "../lib/layout";
 import { downloadText, readJsonFile } from "../lib/fileIO";
 
 interface Sheet {
@@ -284,11 +284,11 @@ function FlowCanvasInner() {
   }
   deleteSelectedRef.current = deleteSelected;
 
-  function autoLayout() {
+  function autoLayout(mode: LayoutMode) {
     const sheetId = activeSheet.id;
     setLayoutAnimating(true);
     commitNow((prev) =>
-      prev.map((s) => (s.id === sheetId ? { ...s, nodes: layoutNodes(s.nodes, s.edges) } : s))
+      prev.map((s) => (s.id === sheetId ? { ...s, nodes: layoutNodes(s.nodes, s.edges, mode) } : s))
     );
     requestAnimationFrame(() => fitView({ duration: 320 }));
     window.setTimeout(() => setLayoutAnimating(false), 400);

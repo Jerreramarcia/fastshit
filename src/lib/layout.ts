@@ -4,10 +4,19 @@ import type { Edge, Node } from "reactflow";
 const NODE_WIDTH = 220;
 const NODE_HEIGHT = 90;
 
-export function layoutNodes(nodes: Node[], edges: Edge[]): Node[] {
+export type LayoutMode = "horizontal" | "vertical" | "compact";
+
+const MODE_CONFIG: Record<LayoutMode, { rankdir: "LR" | "TB"; nodesep: number; ranksep: number }> = {
+  horizontal: { rankdir: "LR", nodesep: 60, ranksep: 110 },
+  vertical: { rankdir: "TB", nodesep: 60, ranksep: 100 },
+  compact: { rankdir: "LR", nodesep: 24, ranksep: 60 },
+};
+
+export function layoutNodes(nodes: Node[], edges: Edge[], mode: LayoutMode = "horizontal"): Node[] {
+  const { rankdir, nodesep, ranksep } = MODE_CONFIG[mode];
   const g = new dagre.graphlib.Graph();
   g.setDefaultEdgeLabel(() => ({}));
-  g.setGraph({ rankdir: "LR", nodesep: 60, ranksep: 110, acyclicer: "greedy" });
+  g.setGraph({ rankdir, nodesep, ranksep, acyclicer: "greedy" });
 
   for (const n of nodes) {
     g.setNode(n.id, { width: NODE_WIDTH, height: NODE_HEIGHT });

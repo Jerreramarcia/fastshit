@@ -1,11 +1,12 @@
-import type { ChangeEvent } from "react";
+import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type { NodeKind } from "../lib/graphTypes";
+import type { LayoutMode } from "../lib/layout";
 
 interface Props {
   onAddNode: (kind: NodeKind) => void;
   onExport: () => void;
   onImport: (file: File) => void;
-  onAutoLayout: () => void;
+  onAutoLayout: (mode: LayoutMode) => void;
 }
 
 const NODE_TOOLS: { key: string; kind: NodeKind; label: string; color: string; bg: string }[] = [
@@ -15,7 +16,25 @@ const NODE_TOOLS: { key: string; kind: NodeKind; label: string; color: string; b
   { key: "4", kind: "page", label: "Pagina", color: "var(--page)", bg: "var(--page-bg)" },
 ];
 
+const LAYOUT_MODES: { mode: LayoutMode; label: string; hint: string }[] = [
+  { mode: "horizontal", label: "Horizontal", hint: "izquierda -> derecha, espaciado normal" },
+  { mode: "vertical", label: "Vertical", hint: "arriba -> abajo" },
+  { mode: "compact", label: "Compacto", hint: "horizontal, menos espacio entre nodos" },
+];
+
 export default function Toolbar({ onAddNode, onExport, onImport, onAutoLayout }: Props) {
+  const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
+  const layoutMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!layoutMenuOpen) return;
+    function handleClick(e: MouseEvent) {
+      if (!layoutMenuRef.current?.contains(e.target as globalThis.Node)) setLayoutMenuOpen(false);
+    }
+    window.addEventListener("mousedown", handleClick);
+    return () => window.removeEventListener("mousedown", handleClick);
+  }, [layoutMenuOpen]);
+
   function handleFile(e: ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
     if (file) onImport(file);
@@ -98,21 +117,68 @@ export default function Toolbar({ onAddNode, onExport, onImport, onAutoLayout }:
         ))}
       </div>
 
-      <button
-        onClick={onAutoLayout}
-        title="Reordenar nodos segun las flechas"
-        style={{
-          padding: "6px 12px",
-          border: "1px solid var(--line)",
-          borderRadius: 6,
-          background: "var(--surface)",
-          color: "var(--ink)",
-          cursor: "pointer",
-          fontSize: 13,
-        }}
-      >
-        Ordenar
-      </button>
+      <div ref={layoutMenuRef} style={{ position: "relative" }}>
+        <button
+          onClick={() => setLayoutMenuOpen((o) => !o)}
+          title="Reordenar nodos segun las flechas"
+          style={{
+            padding: "6px 12px",
+            border: "1px solid var(--line)",
+            borderRadius: 6,
+            background: "var(--surface)",
+            color: "var(--ink)",
+            cursor: "pointer",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          Ordenar
+          <span style={{ fontSize: 10, color: "var(--ink-soft)" }}>▾</span>
+        </button>
+        {layoutMenuOpen && (
+          <div
+            style={{
+              position: "absolute",
+              top: "calc(100% + 4px)",
+              left: 0,
+              zIndex: 60,
+              background: "var(--surface)",
+              border: "1px solid var(--line)",
+              borderRadius: 8,
+              boxShadow: "0 8px 24px rgba(24,32,39,0.14)",
+              padding: 6,
+              minWidth: 210,
+            }}
+          >
+            {LAYOUT_MODES.map((m) => (
+              <button
+                key={m.mode}
+                onClick={() => {
+                  onAutoLayout(m.mode);
+                  setLayoutMenuOpen(false);
+                }}
+                style={{
+                  display: "block",
+                  width: "100%",
+                  textAlign: "left",
+                  padding: "6px 8px",
+                  border: "none",
+                  background: "transparent",
+                  cursor: "pointer",
+                  borderRadius: 5,
+                }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = "var(--paper)")}
+                onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+              >
+                <div style={{ fontSize: 13, color: "var(--ink)" }}>{m.label}</div>
+                <div style={{ fontSize: 11, color: "var(--ink-soft)" }}>{m.hint}</div>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
 
       <span style={{ flex: 1 }} />
 
