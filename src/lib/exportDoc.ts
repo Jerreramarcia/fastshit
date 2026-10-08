@@ -1,5 +1,6 @@
 import type { Edge, Node } from "reactflow";
-import type { Branch, ExportedBundle, ExportedSheet, NodeKind } from "./graphTypes";
+import { hasItems, type Branch, type ExportedBundle, type ExportedSheet, type NodeKind } from "./graphTypes";
+import { KIND_SPECS } from "./nodeKinds";
 
 export function toExportedSheet(sheet: { id: string; name: string; nodes: Node[]; edges: Edge[] }): ExportedSheet {
   return {
@@ -11,7 +12,9 @@ export function toExportedSheet(sheet: { id: string; name: string; nodes: Node[]
       label: (n.data?.label as string) ?? "",
       position: n.position,
       branches: n.type === "conditional" ? (n.data?.branches as Branch[] | undefined) : undefined,
-      items: n.type === "page" ? (n.data?.items as string[] | undefined)?.filter((i) => i.trim() !== "") : undefined,
+      items: hasItems(n.type as NodeKind)
+        ? (n.data?.items as string[] | undefined)?.filter((i) => i.trim() !== "")
+        : undefined,
     })),
     edges: sheet.edges.map((e) => ({
       id: e.id,
@@ -39,10 +42,9 @@ function markdownForSheet(sheet: ExportedSheet): string[] {
   function labelFor(id: string): string {
     const n = byId.get(id);
     if (!n) return "?";
-    if (n.type === "blocker") return `[BLOQUEANTE] ${n.label}`;
-    if (n.type === "conditional") return `[CONDICIONAL] ${n.label}`;
-    if (n.type === "page") return `[PAGINA] ${n.label}`;
-    return n.label;
+    // La accion es el tipo por defecto del flujo, no hace falta anunciarla.
+    if (n.type === "action") return n.label;
+    return `[${KIND_SPECS[n.type]?.tag ?? n.type.toUpperCase()}] ${n.label}`;
   }
 
   function branchLabel(sourceId: string, handle: string | null | undefined): string {
@@ -60,7 +62,7 @@ function markdownForSheet(sheet: ExportedSheet): string[] {
     visited.add(id);
     lines.push(`${"  ".repeat(depth)}${depth === 0 ? "" : "-> "}${labelFor(id)}`);
     const node = byId.get(id);
-    if (node?.type === "page" && node.items) {
+    if (node && hasItems(node.type) && node.items) {
       for (const item of node.items) {
         lines.push(`${"  ".repeat(depth + 1)}- ${item}`);
       }

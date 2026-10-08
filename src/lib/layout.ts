@@ -1,6 +1,7 @@
 import dagre from "dagre";
 import type { Edge, Node } from "reactflow";
-import type { Branch } from "./graphTypes";
+import { hasItems, type Branch, type NodeKind } from "./graphTypes";
+import { KIND_SPECS } from "./nodeKinds";
 
 export type LayoutMode = "horizontal" | "vertical" | "compact";
 
@@ -44,26 +45,34 @@ const TAG_HEIGHT = 16;
 
 function measureNode(n: Node): { width: number; height: number } {
   const label = (n.data?.label as string) ?? "";
+  const kind = (n.type as NodeKind) ?? "action";
+  const spec = KIND_SPECS[kind] ?? KIND_SPECS.action;
+  const paddingX = kind === "page" ? 24 : 26;
+  const font = spec.boldTitle ? SANS_BOLD : SANS;
+  const box = measureTitleBox(label, {
+    minWidth: spec.minWidth,
+    maxWidth: spec.maxWidth,
+    paddingX,
+    font,
+    lineHeight: 18,
+  });
 
-  if (n.type === "page") {
-    const box = measureTitleBox(label, { minWidth: 220, maxWidth: 300, paddingX: 24, font: SANS_BOLD, lineHeight: 18 });
-    const items = (n.data?.items as string[] | undefined)?.length ?? 0;
-    const rows = Math.max(items, 1);
-    const titleHeight = 10 + TAG_HEIGHT + box.lines * box.lineHeight + 10;
-    const itemsHeight = 16 + rows * 21;
-    return { width: box.width, height: titleHeight + 2 + itemsHeight };
-  }
-
-  if (n.type === "conditional") {
-    const box = measureTitleBox(label, { minWidth: 190, maxWidth: 260, paddingX: 26, font: SANS, lineHeight: 18 });
+  if (kind === "conditional") {
     const branches = (n.data?.branches as Branch[] | undefined)?.length ?? 2;
     const height = 8 + TAG_HEIGHT + box.lines * box.lineHeight + 6 + branches * 22 + 6 + 24 + 8;
     return { width: box.width, height };
   }
 
-  const box = measureTitleBox(label, { minWidth: 160, maxWidth: 240, paddingX: 26, font: SANS, lineHeight: 18 });
-  const height = 8 + TAG_HEIGHT + box.lines * box.lineHeight + 8;
-  return { width: box.width, height };
+  const titleHeight = (kind === "page" ? 10 : 8) * 2 + TAG_HEIGHT + box.lines * box.lineHeight;
+
+  if (hasItems(kind)) {
+    // La lista siempre deja una fila libre para escribir, de ahi el minimo de 1.
+    const items = (n.data?.items as string[] | undefined)?.length ?? 0;
+    const rows = Math.max(items, 1);
+    return { width: box.width, height: titleHeight + 2 + 16 + rows * 21 };
+  }
+
+  return { width: box.width, height: titleHeight };
 }
 
 // En una cadena recta (un solo cable de entrada y uno de salida) dagre no

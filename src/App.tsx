@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import FlowCanvas from "./components/FlowCanvas";
+import FlowViewer from "./components/FlowViewer";
 import ProjectSidebar from "./components/ProjectSidebar";
+import { parseShareHash, type ShareTarget } from "./lib/share";
 
 interface Project {
   id: string;
@@ -10,7 +12,26 @@ interface Project {
 let uid = 1;
 const nextId = () => `project${uid++}`;
 
+/**
+ * Un hash `#/v?...` abre el visor de solo lectura en vez del editor, para que el
+ * enlace compartido funcione en el mismo sitio estatico sin router ni servidor.
+ */
+function useShareTarget(): ShareTarget | null {
+  const [target, setTarget] = useState<ShareTarget | null>(() => parseShareHash(window.location.hash));
+
+  useEffect(() => {
+    function onHashChange() {
+      setTarget(parseShareHash(window.location.hash));
+    }
+    window.addEventListener("hashchange", onHashChange);
+    return () => window.removeEventListener("hashchange", onHashChange);
+  }, []);
+
+  return target;
+}
+
 export default function App() {
+  const shareTarget = useShareTarget();
   const [projects, setProjects] = useState<Project[]>([{ id: nextId(), name: "Proyecto 1" }]);
   const [activeId, setActiveId] = useState(() => projects[0].id);
   const [collapsed, setCollapsed] = useState(false);
@@ -33,6 +54,8 @@ export default function App() {
       return next;
     });
   }
+
+  if (shareTarget) return <FlowViewer target={shareTarget} />;
 
   return (
     <div style={{ display: "flex", height: "100vh" }}>

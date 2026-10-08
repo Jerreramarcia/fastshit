@@ -1,4 +1,4 @@
-import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
 import ReactFlow, {
   Background,
   Controls,
@@ -15,27 +15,32 @@ import ReactFlow, {
   type OnConnectStartParams,
 } from "reactflow";
 import "reactflow/dist/style.css";
-import ActionNode from "./nodes/ActionNode";
-import BlockerNode from "./nodes/BlockerNode";
+import makeStatusNode from "./nodes/StatusNode";
 import ConditionalNode from "./nodes/ConditionalNode";
 import PageNode from "./nodes/PageNode";
 import SnappedStepEdge from "./edges/SnappedStepEdge";
 import Toolbar from "./Toolbar";
 import SheetTabs from "./SheetTabs";
-import type { Branch, ExportedBundle, NodeKind } from "../lib/graphTypes";
-import { toExportedSheet, toMarkdown } from "../lib/exportDoc";
+import ShareDialog from "./ShareDialog";
+import { hasItems, type Branch, type ExportedBundle, type NodeKind } from "../lib/graphTypes";
+import { toMarkdown } from "../lib/exportDoc";
+import { bundleToSheets, sheetsToBundle, type Sheet } from "../lib/bundle";
 import { layoutNodes, type LayoutMode } from "../lib/layout";
 import { downloadText, readJsonFile } from "../lib/fileIO";
 import { computeEdgeColors } from "../lib/edgeColors";
+import { KIND_LIST, specForKey } from "../lib/nodeKinds";
+import {
+  getLiveSession,
+  getToken,
+  publishToLiveSession,
+  setLiveSession,
+  type LiveSession,
+} from "../lib/share";
 
 const COLOR_EDGES_STORAGE_KEY = "fastshit.colorEdgesEnabled";
-
-interface Sheet {
-  id: string;
-  name: string;
-  nodes: Node[];
-  edges: Edge[];
-}
+const AUTO_PUBLISH_STORAGE_KEY = "fastshit.autoPublish";
+/** Margen tras el ultimo cambio antes de subir el flujo al gist. */
+const AUTO_PUBLISH_DEBOUNCE_MS = 4000;
 
 let uid = 1;
 const nextId = (prefix: string) => `${prefix}${uid++}`;
@@ -53,12 +58,6 @@ interface PendingConnection {
   flowY: number;
 }
 
-const MENU_OPTIONS: { key: string; kind: NodeKind; label: string; color: string; bg: string }[] = [
-  { key: "1", kind: "action", label: "Accion", color: "var(--action)", bg: "var(--action-bg)" },
-  { key: "2", kind: "blocker", label: "Bloqueante", color: "var(--blocker)", bg: "var(--blocker-bg)" },
-  { key: "3", kind: "conditional", label: "Condicional", color: "var(--conditional)", bg: "var(--conditional-bg)" },
-  { key: "4", kind: "page", label: "Pagina", color: "var(--page)", bg: "var(--page-bg)" },
-];
 
 function ConnectionTypeMenu({
   pending,
@@ -71,7 +70,7 @@ function ConnectionTypeMenu({
 }) {
   useEffect(() => {
     function handleKey(e: KeyboardEvent) {
-      const opt = MENU_OPTIONS.find((o) => o.key === e.key);
+      const opt = specForKey(e.key);
       if (opt) {
         e.preventDefault();
         onPick(opt.kind);
@@ -105,7 +104,7 @@ function ConnectionTypeMenu({
           minWidth: 168,
         }}
       >
-        {MENU_OPTIONS.map((o) => (
+        {KIND_LIST.map((o) => (
           <button
             key={o.key}
             onClick={() => onPick(o.kind)}
@@ -180,6 +179,16 @@ function FlowCanvasInner() {
       return next;
     });
   }
+  const [shareOpen, setShareOpen] = useState(false);
+  const [liveSession, setLiveSessionState] = useState<LiveSession | null>(() => getLiveSession());
+  const [autoPublish, setAutoPublish] = useState(() => {
+    if (typeof window === "undefined") return false;
+    return window.localStorage.getItem(AUTO_PUBLISH_STORAGE_KEY) === "1";
+  });
+  const [publishState, setPublishState] = useState<
+    { status: "idle" | "publishing" } | { status: "done"; at: string } | { status: "error"; message: string }
+  >({ status: "idle" });
+
   const connectStartRef = useRef<{ nodeId: string | null; handleId: string | null } | null>(null);
   const { screenToFlowPosition, fitView } = useReactFlow();
 
@@ -241,6 +250,8 @@ function FlowCanvasInner() {
   }
 
   const deleteSelectedRef = useRef<() => void>(() => {});
+  const menuOpenRef = useRef(false);
+  menuOpenRef.current = pendingConnection !== null;
 
   useEffect(() => {
     function handleGlobalKey(e: KeyboardEvent) {
@@ -251,12 +262,25 @@ function FlowCanvasInner() {
         else undo();
         return;
       }
+      const target = e.target as HTMLElement | null;
+      const tag = target?.tagName;
+      const typing = tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable;
+
       if (!mod && (e.key === "Backspace" || e.key === "Delete")) {
-        const target = e.target as HTMLElement | null;
-        const tag = target?.tagName;
-        if (tag === "INPUT" || tag === "TEXTAREA" || target?.isContentEditable) return;
+        if (typing) return;
         e.preventDefault();
         deleteSelectedRef.current();
+        return;
+      }
+
+      // Con nodos seleccionados, las mismas teclas del menu cambian su tipo.
+      // Si el menu de creacion esta abierto, manda el menu.
+      if (!mod && !typing && !menuOpenRef.current) {
+        const spec = specForKey(e.key);
+        if (spec) {
+          e.preventDefault();
+          convertSelectedRef.current(spec.kind);
+        }
       }
     }
     window.addEventListener("keydown", handleGlobalKey);
@@ -300,6 +324,40 @@ function FlowCanvasInner() {
   }
   deleteSelectedRef.current = deleteSelected;
 
+  /**
+   * Cambia el tipo de los nodos seleccionados conservando titulo y detalles, que
+   * es como un nodo avanza de error a testing y de ahi a ok sin reescribirlo.
+   */
+  function convertSelected(kind: NodeKind) {
+    const sheetId = activeSheet.id;
+    if (!activeSheet.nodes.some((n) => n.selected)) return;
+    commitNow((prev) =>
+      prev.map((s) => {
+        if (s.id !== sheetId) return s;
+        const nodes = s.nodes.map((n) => {
+          if (!n.selected || n.type === kind) return n;
+          const data = { ...n.data, autoFocus: false };
+          if (kind === "conditional" && !data.branches) data.branches = defaultBranches();
+          if (hasItems(kind) && !data.items) data.items = [];
+          return { ...n, type: kind, data };
+        });
+        // Un tipo sin ramas pierde las flechas que salian de una rama concreta.
+        const edges =
+          kind === "conditional"
+            ? s.edges
+            : s.edges.map((e) => {
+                const source = nodes.find((n) => n.id === e.source);
+                return source && source.type !== "conditional" && e.sourceHandle
+                  ? { ...e, sourceHandle: null }
+                  : e;
+              });
+        return { ...s, nodes, edges };
+      })
+    );
+  }
+  const convertSelectedRef = useRef<(kind: NodeKind) => void>(() => {});
+  convertSelectedRef.current = convertSelected;
+
   function autoLayout(mode: LayoutMode) {
     const sheetId = activeSheet.id;
     setLayoutAnimating(true);
@@ -311,7 +369,15 @@ function FlowCanvasInner() {
   }
 
   const nodeTypes = useMemo(
-    () => ({ action: ActionNode, blocker: BlockerNode, conditional: ConditionalNode, page: PageNode }),
+    () => ({
+      action: makeStatusNode("action"),
+      blocker: makeStatusNode("blocker"),
+      conditional: ConditionalNode,
+      page: PageNode,
+      error: makeStatusNode("error"),
+      testing: makeStatusNode("testing"),
+      ok: makeStatusNode("ok"),
+    }),
     []
   );
   const edgeTypes = useMemo(() => ({ snappedStep: SnappedStepEdge }), []);
@@ -359,7 +425,7 @@ function FlowCanvasInner() {
     if (node.type === "conditional") {
       data = { ...data, ...branchCallbacks(sheetId, node.id) };
     }
-    if (node.type === "page") {
+    if (hasItems(node.type as NodeKind)) {
       data = {
         ...data,
         onItemsChange: (items: string[]) =>
@@ -463,7 +529,7 @@ function FlowCanvasInner() {
       label: "",
       autoFocus: true,
       ...(kind === "conditional" ? { branches: defaultBranches() } : {}),
-      ...(kind === "page" ? { items: [] } : {}),
+      ...(hasItems(kind) ? { items: [] } : {}),
     };
   }
 
@@ -506,34 +572,69 @@ function FlowCanvasInner() {
   }
 
   function handleExport() {
-    const bundle: ExportedBundle = { sheets: sheets.map((s) => toExportedSheet(s)) };
+    const bundle = sheetsToBundle(sheets);
     downloadText("flow.json", JSON.stringify(bundle, null, 2), "application/json");
     downloadText("flow.md", toMarkdown(bundle), "text/markdown");
   }
 
   async function handleImport(file: File) {
     const bundle = await readJsonFile<ExportedBundle>(file);
-    const imported: Sheet[] = bundle.sheets.map((s) => ({
-      id: s.id,
-      name: s.name,
-      nodes: s.nodes.map((n) => ({
-        id: n.id,
-        type: n.type,
-        position: n.position,
-        data: {
-          label: n.label,
-          ...(n.branches ? { branches: n.branches } : {}),
-          ...(n.type === "page" ? { items: n.items ?? [] } : {}),
-        },
-      })),
-      edges: s.edges.map((e) => ({ id: e.id, source: e.source, target: e.target, sourceHandle: e.sourceHandle })),
-    }));
+    const imported = bundleToSheets(bundle);
     if (imported.length === 0) return;
     historyRef.current = { past: [], future: [] };
     burstRef.current = { before: null, timer: null };
     setSheets(imported);
     setActiveSheetId(imported[0].id);
   }
+
+  function updateLiveSession(next: LiveSession | null) {
+    setLiveSessionState(next);
+    setLiveSession(next);
+    if (!next) setPublishState({ status: "idle" });
+  }
+
+  const publishNow = useCallback(
+    async (current: Sheet[], session: LiveSession) => {
+      const token = getToken();
+      if (!token) {
+        setPublishState({ status: "error", message: "No hay token guardado en este navegador." });
+        return;
+      }
+      setPublishState({ status: "publishing" });
+      try {
+        const next = await publishToLiveSession(token, session, sheetsToBundle(current));
+        setLiveSessionState(next);
+        setLiveSession(next);
+        setPublishState({ status: "done", at: next.updatedAt });
+      } catch (err) {
+        setPublishState({
+          status: "error",
+          message: err instanceof Error ? err.message : "No se pudo publicar.",
+        });
+      }
+    },
+    []
+  );
+
+  function toggleAutoPublish(value: boolean) {
+    setAutoPublish(value);
+    window.localStorage.setItem(AUTO_PUBLISH_STORAGE_KEY, value ? "1" : "0");
+  }
+
+  // Con el autopublicado activo, cada rafaga de ediciones sube una sola vez: sin
+  // el margen de espera, escribir un titulo haria una peticion por tecla.
+  const firstPublishSkipped = useRef(false);
+  useEffect(() => {
+    if (!autoPublish || !liveSession) return;
+    if (!firstPublishSkipped.current) {
+      firstPublishSkipped.current = true;
+      return;
+    }
+    const timer = window.setTimeout(() => void publishNow(sheets, liveSession), AUTO_PUBLISH_DEBOUNCE_MS);
+    return () => window.clearTimeout(timer);
+    // `liveSession.updatedAt` cambia al publicar: solo interesa su identidad.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sheets, autoPublish, liveSession?.gistId, publishNow]);
 
   function addSheet() {
     const s = makeSheet(`Capa ${sheets.length + 1}`);
@@ -561,6 +662,19 @@ function FlowCanvasInner() {
         onAutoLayout={autoLayout}
         colorEdgesEnabled={colorEdgesEnabled}
         onToggleColorEdges={toggleColorEdges}
+        onShare={() => setShareOpen(true)}
+        shareStatus={
+          liveSession
+            ? publishState.status === "publishing"
+              ? "Publicando..."
+              : publishState.status === "error"
+                ? "Error al publicar"
+                : autoPublish
+                  ? "En vivo (automatico)"
+                  : "En vivo"
+            : null
+        }
+        shareError={publishState.status === "error" ? publishState.message : null}
       />
       <div
         className={layoutAnimating ? "layout-animate" : undefined}
@@ -594,6 +708,16 @@ function FlowCanvasInner() {
           />
         )}
       </div>
+      {shareOpen && (
+        <ShareDialog
+          bundle={sheetsToBundle(sheets)}
+          session={liveSession}
+          onSessionChange={updateLiveSession}
+          autoPublish={autoPublish}
+          onToggleAutoPublish={toggleAutoPublish}
+          onClose={() => setShareOpen(false)}
+        />
+      )}
       <SheetTabs
         sheets={sheets.map((s) => ({ id: s.id, name: s.name }))}
         activeId={activeSheet.id}

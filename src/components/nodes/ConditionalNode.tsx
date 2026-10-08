@@ -7,6 +7,7 @@ interface ConditionalData {
   label: string;
   branches: Branch[];
   autoFocus?: boolean;
+  readOnly?: boolean;
   onLabelChange: (value: string) => void;
   onAddBranch: () => void;
   onRenameBranch: (branchId: string, value: string) => void;
@@ -60,6 +61,7 @@ export default function ConditionalNode({ data, selected }: NodeProps<Conditiona
           value={data.label}
           placeholder="texto del condicional"
           autoFocus={data.autoFocus}
+          readOnly={data.readOnly}
           onChange={data.onLabelChange}
           style={{ fontSize: 13, marginBottom: 6 }}
         />
@@ -80,7 +82,7 @@ export default function ConditionalNode({ data, selected }: NodeProps<Conditiona
                 minHeight: 18,
               }}
             >
-              {editingId === b.id ? (
+              {editingId === b.id && !data.readOnly ? (
                 <input
                   autoFocus
                   value={draft}
@@ -104,17 +106,18 @@ export default function ConditionalNode({ data, selected }: NodeProps<Conditiona
               ) : (
                 <span
                   onClick={(e) => {
+                    if (data.readOnly) return;
                     e.stopPropagation();
                     startEdit(b);
                   }}
                   onDoubleClick={(e) => e.stopPropagation()}
-                  style={{ cursor: "text", flex: 1 }}
-                  title="Click para renombrar"
+                  style={{ cursor: data.readOnly ? "default" : "text", flex: 1 }}
+                  title={data.readOnly ? undefined : "Click para renombrar"}
                 >
                   {b.label}
                 </span>
               )}
-              {branches.length > 1 && (
+              {branches.length > 1 && !data.readOnly && (
                 <button
                   onClick={(e) => {
                     e.stopPropagation();
@@ -145,6 +148,7 @@ export default function ConditionalNode({ data, selected }: NodeProps<Conditiona
           ))}
         </div>
 
+        {!data.readOnly && (
         <button
           onClick={(e) => {
             e.stopPropagation();
@@ -165,6 +169,7 @@ export default function ConditionalNode({ data, selected }: NodeProps<Conditiona
         >
           + rama
         </button>
+        )}
       </div>
     </div>
   );

@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ChangeEvent } from "react";
 import type { NodeKind } from "../lib/graphTypes";
 import type { LayoutMode } from "../lib/layout";
+import { KIND_LIST } from "../lib/nodeKinds";
 
 interface Props {
   onAddNode: (kind: NodeKind) => void;
@@ -9,14 +10,11 @@ interface Props {
   onAutoLayout: (mode: LayoutMode) => void;
   colorEdgesEnabled: boolean;
   onToggleColorEdges: () => void;
+  onShare: () => void;
+  /** Texto corto del estado de la sesion compartida; `null` si no hay ninguna. */
+  shareStatus: string | null;
+  shareError: string | null;
 }
-
-const NODE_TOOLS: { key: string; kind: NodeKind; label: string; color: string; bg: string }[] = [
-  { key: "1", kind: "action", label: "Accion", color: "var(--action)", bg: "var(--action-bg)" },
-  { key: "2", kind: "blocker", label: "Bloqueante", color: "var(--blocker)", bg: "var(--blocker-bg)" },
-  { key: "3", kind: "conditional", label: "Condicional", color: "var(--conditional)", bg: "var(--conditional-bg)" },
-  { key: "4", kind: "page", label: "Pagina", color: "var(--page)", bg: "var(--page-bg)" },
-];
 
 const LAYOUT_MODES: { mode: LayoutMode; label: string; hint: string }[] = [
   { mode: "horizontal", label: "Horizontal", hint: "izquierda -> derecha, espaciado normal" },
@@ -31,6 +29,9 @@ export default function Toolbar({
   onAutoLayout,
   colorEdgesEnabled,
   onToggleColorEdges,
+  onShare,
+  shareStatus,
+  shareError,
 }: Props) {
   const [layoutMenuOpen, setLayoutMenuOpen] = useState(false);
   const layoutMenuRef = useRef<HTMLDivElement>(null);
@@ -86,11 +87,11 @@ export default function Toolbar({
       <div style={{ width: 1, height: 22, background: "var(--line)" }} />
 
       <div style={{ display: "flex", gap: 6 }}>
-        {NODE_TOOLS.map((t) => (
+        {KIND_LIST.map((t) => (
           <button
             key={t.kind}
             onClick={() => onAddNode(t.kind)}
-            title={`Agregar ${t.label} (tecla ${t.key} al soltar una flecha)`}
+            title={`${t.hint ? `${t.label}: ${t.hint}. ` : ""}Tecla ${t.key}: crea uno al soltar una flecha, o cambia a este tipo los nodos seleccionados`}
             style={{
               display: "flex",
               alignItems: "center",
@@ -207,7 +208,40 @@ export default function Toolbar({
 
       <span style={{ flex: 1 }} />
 
-      <div style={{ display: "flex", gap: 8 }}>
+      <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+        <button
+          onClick={onShare}
+          title={shareError ?? "Obtener un enlace para que otra persona vea este flujo"}
+          style={{
+            padding: "6px 12px",
+            border: `1px solid ${shareError ? "var(--error)" : shareStatus ? "var(--ok)" : "var(--line)"}`,
+            borderRadius: 6,
+            background: "var(--surface)",
+            color: shareError ? "var(--error)" : "var(--ink)",
+            cursor: "pointer",
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+          }}
+        >
+          Compartir
+          {shareStatus && (
+            <span
+              style={{
+                fontFamily: "var(--mono)",
+                fontSize: 10,
+                fontWeight: 600,
+                padding: "1px 5px",
+                borderRadius: 3,
+                background: shareError ? "var(--error-bg)" : "var(--ok-bg)",
+                color: shareError ? "var(--error)" : "var(--ok)",
+              }}
+            >
+              {shareStatus}
+            </span>
+          )}
+        </button>
         <button
           onClick={onExport}
           style={{

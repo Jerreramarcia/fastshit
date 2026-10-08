@@ -22,3 +22,7 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
+
+# Id del gist de la sesion compartida (apunta a un gist secreto personal)
+.fastshit-share.json
+.playwright-mcp

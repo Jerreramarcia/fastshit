@@ -4,12 +4,13 @@ interface Props {
   value: string;
   placeholder: string;
   autoFocus?: boolean;
+  readOnly?: boolean;
   onChange: (value: string) => void;
   style?: React.CSSProperties;
 }
 
-export default function InlineTitle({ value, placeholder, autoFocus, onChange, style }: Props) {
-  const [editing, setEditing] = useState(!!autoFocus);
+export default function InlineTitle({ value, placeholder, autoFocus, readOnly, onChange, style }: Props) {
+  const [editing, setEditing] = useState(!readOnly && !!autoFocus);
   const [draft, setDraft] = useState(value);
   const ref = useRef<HTMLInputElement>(null);
 
@@ -27,6 +28,12 @@ export default function InlineTitle({ value, placeholder, autoFocus, onChange, s
   function commit() {
     onChange(draft.trim());
     setEditing(false);
+  }
+
+  if (readOnly) {
+    return (
+      <div style={{ color: value ? "var(--ink)" : "var(--ink-soft)", ...style }}>{value || placeholder}</div>
+    );
   }
 
   if (editing) {

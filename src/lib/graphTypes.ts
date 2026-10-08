@@ -1,4 +1,18 @@
-export type NodeKind = "action" | "blocker" | "conditional" | "page";
+export type NodeKind = "action" | "blocker" | "conditional" | "page" | "error" | "testing" | "ok";
+
+/** Tipos cuyo cuerpo es una lista de lineas editables (`items`). */
+export const LIST_KINDS: NodeKind[] = ["page", "error", "testing", "ok"];
+
+/** Tipos que representan el estado de un arreglo en curso. */
+export const STATUS_KINDS: NodeKind[] = ["error", "testing", "ok"];
+
+export function hasItems(kind: NodeKind | undefined): boolean {
+  return !!kind && LIST_KINDS.includes(kind);
+}
+
+export function isStatusKind(kind: NodeKind | undefined): boolean {
+  return !!kind && STATUS_KINDS.includes(kind);
+}
 
 export interface Branch {
   id: string;
