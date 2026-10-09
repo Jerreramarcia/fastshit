@@ -19,7 +19,7 @@ export default function LinkedText({ text }: { text: string }) {
             rel="noopener noreferrer"
             className="nodrag nopan"
             onClick={(e) => e.stopPropagation()}
-            style={{ color: "inherit", textDecoration: "underline", pointerEvents: "all" }}
+            style={{ color: "var(--action)", textDecoration: "none", pointerEvents: "all" }}
           >
             {s.text}
           </a>
