@@ -210,7 +210,7 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
           flexWrap: "wrap",
         }}
       >
-        <span style={{ fontSize: 14, fontWeight: 600 }}>fastShit</span>
+        <span style={{ fontSize: 14, fontWeight: 600 }}>fastView</span>
         <span
           style={{
             fontFamily: "var(--mono)",

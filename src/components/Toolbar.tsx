@@ -81,7 +81,7 @@ export default function Toolbar({
         >
           fS
         </span>
-        <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.2 }}>fastShit</span>
+        <span style={{ fontSize: 14, fontWeight: 600, letterSpacing: -0.2 }}>fastView</span>
       </div>
 
       <div style={{ width: 1, height: 22, background: "var(--line)" }} />
