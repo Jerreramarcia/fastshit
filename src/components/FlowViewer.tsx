@@ -272,13 +272,50 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
             >
               {refreshing ? "Leyendo..." : "Actualizar"}
             </button>
-            <label
-              style={{ fontSize: 12, color: "var(--ink-soft)", display: "flex", alignItems: "center", gap: 5 }}
-              title={`Relee el flujo cada ${POLL_MS / 1000} segundos`}
+            <button
+              role="switch"
+              aria-checked={autoRefresh}
+              onClick={() => setAutoRefresh((on) => !on)}
+              title={autoRefresh ? `Relee el flujo cada ${POLL_MS / 1000} segundos` : "Lectura automatica en pausa"}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 7,
+                padding: "4px 10px 4px 6px",
+                border: `1px solid ${autoRefresh ? "var(--ok)" : "var(--line)"}`,
+                borderRadius: 999,
+                background: autoRefresh ? "var(--ok-bg)" : "var(--surface)",
+                color: autoRefresh ? "var(--ok)" : "var(--ink-soft)",
+                cursor: "pointer",
+                fontSize: 12,
+                fontWeight: 600,
+              }}
             >
-              <input type="checkbox" checked={autoRefresh} onChange={(e) => setAutoRefresh(e.target.checked)} />
-              auto
-            </label>
+              <span
+                style={{
+                  position: "relative",
+                  width: 26,
+                  height: 14,
+                  borderRadius: 999,
+                  background: autoRefresh ? "var(--ok)" : "var(--line)",
+                  transition: "background 0.15s",
+                }}
+              >
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 2,
+                    left: autoRefresh ? 14 : 2,
+                    width: 10,
+                    height: 10,
+                    borderRadius: "50%",
+                    background: "var(--surface)",
+                    transition: "left 0.15s",
+                  }}
+                />
+              </span>
+              {autoRefresh ? `auto · ${POLL_MS / 1000}s` : "auto"}
+            </button>
           </>
         )}
       </div>
