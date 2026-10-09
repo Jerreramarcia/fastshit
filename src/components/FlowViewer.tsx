@@ -314,7 +314,7 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
                   }}
                 />
               </span>
-              {autoRefresh ? `auto · ${POLL_MS / 1000}s` : "auto"}
+              {`auto · ${POLL_MS / 1000}s`}
             </button>
           </>
         )}
