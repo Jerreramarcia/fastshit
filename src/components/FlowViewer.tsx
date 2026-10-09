@@ -9,30 +9,35 @@ import { bundleToSheets, type Sheet } from "../lib/bundle";
 import { decodeBundle, fetchLiveBundle, type ShareTarget } from "../lib/share";
 import { KIND_LIST } from "../lib/nodeKinds";
 import { LinkRulesContext } from "../lib/links";
-import { isStatusKind, type NodeKind } from "../lib/graphTypes";
-import { filterPending } from "../lib/pendingFilter";
+import { isStatusKind, STATUS_KINDS, type NodeKind } from "../lib/graphTypes";
+import { chainEnds, filterByStatus } from "../lib/statusFilter";
+import StatusFilterButton from "./StatusFilterButton";
 
 /** Cada cuanto se vuelve a leer una sesion en vivo. */
 const POLL_MS = 15000;
 
 const noop = () => {};
 
-/** `&f=pendientes` en el hash abre el visor ya filtrado, para poder compartirlo asi. */
+/** `&f=error,testing` en el hash abre el visor ya filtrado, para poder compartirlo asi. */
 const FILTER_PARAM = "f";
-const PENDING = "pendientes";
+// Alias de los primeros links compartidos, cuando el filtro solo era "pendientes".
+const PENDING_ALIAS = "pendientes";
 
-function readPendingFromHash(): boolean {
+function readFilterFromHash(): Set<NodeKind> {
   const query = window.location.hash.split("?")[1] ?? "";
-  return new URLSearchParams(query).get(FILTER_PARAM) === PENDING;
+  const raw = new URLSearchParams(query).get(FILTER_PARAM);
+  if (!raw) return new Set(STATUS_KINDS);
+  if (raw === PENDING_ALIAS) return new Set<NodeKind>(["error", "testing"]);
+  return new Set(raw.split(",").filter((k): k is NodeKind => STATUS_KINDS.includes(k as NodeKind)));
 }
 
 // replaceState no dispara hashchange: cambiar el filtro no recarga el flujo.
-function writePendingToHash(on: boolean) {
+function writeFilterToHash(kinds: Set<NodeKind>) {
   const [path, query = ""] = window.location.hash.split("?");
   const params = new URLSearchParams(query);
-  if (on) params.set(FILTER_PARAM, PENDING);
-  else params.delete(FILTER_PARAM);
-  const hash = `${path}?${params.toString().replace(/%2F/g, "/")}`;
+  if (kinds.size === STATUS_KINDS.length) params.delete(FILTER_PARAM);
+  else params.set(FILTER_PARAM, STATUS_KINDS.filter((k) => kinds.has(k)).join(","));
+  const hash = `${path}?${params.toString().replace(/%2F/g, "/").replace(/%2C/g, ",")}`;
   window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
 }
 
@@ -111,7 +116,7 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
   const [justUpdated, setJustUpdated] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
-  const [onlyPending, setOnlyPending] = useState(readPendingFromHash);
+  const [shownKinds, setShownKinds] = useState(readFilterFromHash);
   // Hash del ultimo bundle visto: evita repintar cuando el gist no cambio.
   const signatureRef = useRef<string>("");
 
@@ -162,13 +167,21 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
 
   const activeSheet = sheets?.find((s) => s.id === activeId) ?? sheets?.[0] ?? null;
   const summary = sheets ? statusSummary(sheets) : [];
+  const filtering = shownKinds.size < STATUS_KINDS.length;
   const shownSheet = useMemo(
-    () => (activeSheet && onlyPending ? filterPending(activeSheet) : activeSheet),
-    [activeSheet, onlyPending]
+    () => (activeSheet && filtering ? filterByStatus(activeSheet, shownKinds) : activeSheet),
+    [activeSheet, filtering, shownKinds]
   );
-  const togglePending = (on: boolean) => {
-    setOnlyPending(on);
-    writePendingToHash(on);
+  const chainCounts = useMemo(() => {
+    const counts = new Map<NodeKind, number>();
+    for (const n of activeSheet ? chainEnds(activeSheet) : []) {
+      counts.set(n.type as NodeKind, (counts.get(n.type as NodeKind) ?? 0) + 1);
+    }
+    return counts;
+  }, [activeSheet]);
+  const changeFilter = (kinds: Set<NodeKind>) => {
+    setShownKinds(kinds);
+    writeFilterToHash(kinds);
   };
 
   if (error && !sheets) {
@@ -239,14 +252,6 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
 
         <span style={{ flex: 1 }} />
 
-        <label
-          style={{ fontSize: 12, color: "var(--ink-soft)", display: "flex", alignItems: "center", gap: 5 }}
-          title="Oculta los flujos que ya terminaron en OK y deja los que siguen en error o en verificacion"
-        >
-          <input type="checkbox" checked={onlyPending} onChange={(e) => togglePending(e.target.checked)} />
-          solo pendientes
-        </label>
-
         {isLive && (
           <>
             <span style={{ fontSize: 12, color: justUpdated ? "var(--ok)" : "var(--ink-soft)" }}>
@@ -284,10 +289,13 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
         </div>
       )}
 
-      <div style={{ flex: 1, minHeight: 0 }}>
-        <ReactFlowProvider key={`${activeSheet.id}:${onlyPending}`}>
+      <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+        <ReactFlowProvider key={`${activeSheet.id}:${[...shownKinds].sort().join(",")}`}>
           <ViewerCanvas sheet={shownSheet} />
         </ReactFlowProvider>
+        {chainCounts.size > 0 && (
+          <StatusFilterButton selected={shownKinds} counts={chainCounts} onChange={changeFilter} />
+        )}
       </div>
 
       {sheets && sheets.length > 1 && (

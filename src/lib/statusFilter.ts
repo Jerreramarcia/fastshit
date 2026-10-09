@@ -3,26 +3,19 @@ import type { Sheet } from "./bundle";
 import { isStatusKind, type NodeKind } from "./graphTypes";
 
 /**
- * Deja solo las cadenas de estado que no han terminado en OK, con todo lo que
- * cuelga por encima de ellas (la fase, los nodos previos de la cadena). Una
- * pestaña sin nodos de estado se muestra entera: no hay nada que filtrar.
+ * Deja solo las cadenas de estado cuyo ultimo nodo es de uno de los tipos
+ * pedidos, con todo lo que cuelga por encima de ellas (la fase, los nodos
+ * previos de la cadena). Una pestaña sin nodos de estado se muestra entera.
  */
-export function filterPending(sheet: Sheet): Sheet {
-  const kindOf = new Map(sheet.nodes.map((n) => [n.id, n.type as NodeKind]));
-  const isStatus = (id: string) => isStatusKind(kindOf.get(id));
-  if (!sheet.nodes.some((n) => isStatus(n.id))) return sheet;
+export function filterByStatus(sheet: Sheet, kinds: ReadonlySet<NodeKind>): Sheet {
+  if (!sheet.nodes.some((n) => isStatusKind(n.type as NodeKind))) return sheet;
 
   const incoming = new Map<string, string[]>();
-  const statusOut = new Set<string>();
-  for (const e of sheet.edges) {
-    incoming.set(e.target, [...(incoming.get(e.target) ?? []), e.source]);
-    if (isStatus(e.target)) statusOut.add(e.source);
-  }
+  for (const e of sheet.edges) incoming.set(e.target, [...(incoming.get(e.target) ?? []), e.source]);
 
-  // El estado de una cadena es el de su ultimo nodo: un KO tras un OK vuelve a estar pendiente.
-  const openLeaves = sheet.nodes.filter((n) => isStatus(n.id) && !statusOut.has(n.id) && n.type !== "ok");
+  const leaves = chainEnds(sheet);
   const keep = new Set<string>();
-  const stack = openLeaves.map((n) => n.id);
+  const stack = leaves.filter((n) => kinds.has(n.type as NodeKind)).map((n) => n.id);
   while (stack.length) {
     const id = stack.pop()!;
     if (keep.has(id)) continue;
@@ -33,6 +26,13 @@ export function filterPending(sheet: Sheet): Sheet {
   const nodes = compact(sheet.nodes.filter((n) => keep.has(n.id)), sheet);
   const edges = sheet.edges.filter((e) => keep.has(e.source) && keep.has(e.target));
   return { ...sheet, nodes, edges };
+}
+
+/** Ultimo nodo de cada cadena de estado: el que da su estado, asi un KO tras un OK cuenta como error. */
+export function chainEnds(sheet: Sheet): Node[] {
+  const kindOf = new Map(sheet.nodes.map((n) => [n.id, n.type as NodeKind]));
+  const statusOut = new Set(sheet.edges.filter((e) => isStatusKind(kindOf.get(e.target))).map((e) => e.source));
+  return sheet.nodes.filter((n) => isStatusKind(n.type as NodeKind) && !statusOut.has(n.id));
 }
 
 /**
