@@ -10,11 +10,31 @@ import { decodeBundle, fetchLiveBundle, type ShareTarget } from "../lib/share";
 import { KIND_LIST } from "../lib/nodeKinds";
 import { LinkRulesContext } from "../lib/links";
 import { isStatusKind, type NodeKind } from "../lib/graphTypes";
+import { filterPending } from "../lib/pendingFilter";
 
 /** Cada cuanto se vuelve a leer una sesion en vivo. */
 const POLL_MS = 15000;
 
 const noop = () => {};
+
+/** `&f=pendientes` en el hash abre el visor ya filtrado, para poder compartirlo asi. */
+const FILTER_PARAM = "f";
+const PENDING = "pendientes";
+
+function readPendingFromHash(): boolean {
+  const query = window.location.hash.split("?")[1] ?? "";
+  return new URLSearchParams(query).get(FILTER_PARAM) === PENDING;
+}
+
+// replaceState no dispara hashchange: cambiar el filtro no recarga el flujo.
+function writePendingToHash(on: boolean) {
+  const [path, query = ""] = window.location.hash.split("?");
+  const params = new URLSearchParams(query);
+  if (on) params.set(FILTER_PARAM, PENDING);
+  else params.delete(FILTER_PARAM);
+  const hash = `${path}?${params.toString().replace(/%2F/g, "/")}`;
+  window.history.replaceState(null, "", `${window.location.pathname}${window.location.search}${hash}`);
+}
 
 function relativeTime(from: number): string {
   const seconds = Math.round((Date.now() - from) / 1000);
@@ -91,6 +111,7 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
   const [justUpdated, setJustUpdated] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
+  const [onlyPending, setOnlyPending] = useState(readPendingFromHash);
   // Hash del ultimo bundle visto: evita repintar cuando el gist no cambio.
   const signatureRef = useRef<string>("");
 
@@ -141,6 +162,14 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
 
   const activeSheet = sheets?.find((s) => s.id === activeId) ?? sheets?.[0] ?? null;
   const summary = sheets ? statusSummary(sheets) : [];
+  const shownSheet = useMemo(
+    () => (activeSheet && onlyPending ? filterPending(activeSheet) : activeSheet),
+    [activeSheet, onlyPending]
+  );
+  const togglePending = (on: boolean) => {
+    setOnlyPending(on);
+    writePendingToHash(on);
+  };
 
   if (error && !sheets) {
     return (
@@ -151,7 +180,7 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
     );
   }
 
-  if (!activeSheet) {
+  if (!activeSheet || !shownSheet) {
     return <div style={{ padding: 32, color: "var(--ink-soft)" }}>Cargando flujo compartido...</div>;
   }
 
@@ -210,6 +239,14 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
 
         <span style={{ flex: 1 }} />
 
+        <label
+          style={{ fontSize: 12, color: "var(--ink-soft)", display: "flex", alignItems: "center", gap: 5 }}
+          title="Oculta los flujos que ya terminaron en OK y deja los que siguen en error o en verificacion"
+        >
+          <input type="checkbox" checked={onlyPending} onChange={(e) => togglePending(e.target.checked)} />
+          solo pendientes
+        </label>
+
         {isLive && (
           <>
             <span style={{ fontSize: 12, color: justUpdated ? "var(--ok)" : "var(--ink-soft)" }}>
@@ -248,8 +285,8 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
       )}
 
       <div style={{ flex: 1, minHeight: 0 }}>
-        <ReactFlowProvider key={activeSheet.id}>
-          <ViewerCanvas sheet={activeSheet} />
+        <ReactFlowProvider key={`${activeSheet.id}:${onlyPending}`}>
+          <ViewerCanvas sheet={shownSheet} />
         </ReactFlowProvider>
       </div>
 
