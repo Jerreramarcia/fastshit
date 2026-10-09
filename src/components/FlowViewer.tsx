@@ -27,7 +27,7 @@ function readFilterFromHash(): Set<NodeKind> {
   const query = window.location.hash.split("?")[1] ?? "";
   const raw = new URLSearchParams(query).get(FILTER_PARAM);
   if (!raw) return new Set(STATUS_KINDS);
-  if (raw === PENDING_ALIAS) return new Set<NodeKind>(["error", "testing"]);
+  if (raw === PENDING_ALIAS) return new Set<NodeKind>(["mejora", "error", "testing"]);
   return new Set(raw.split(",").filter((k): k is NodeKind => STATUS_KINDS.includes(k as NodeKind)));
 }
 
@@ -70,6 +70,7 @@ function ViewerCanvas({ sheet }: { sheet: Sheet }) {
       blocker: makeStatusNode("blocker"),
       conditional: ConditionalNode,
       page: PageNode,
+      mejora: makeStatusNode("mejora"),
       error: makeStatusNode("error"),
       testing: makeStatusNode("testing"),
       ok: makeStatusNode("ok"),

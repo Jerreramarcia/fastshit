@@ -374,6 +374,7 @@ function FlowCanvasInner() {
       blocker: makeStatusNode("blocker"),
       conditional: ConditionalNode,
       page: PageNode,
+      mejora: makeStatusNode("mejora"),
       error: makeStatusNode("error"),
       testing: makeStatusNode("testing"),
       ok: makeStatusNode("ok"),

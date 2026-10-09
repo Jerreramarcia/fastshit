@@ -15,8 +15,8 @@ export interface StatusData {
 
 /**
  * Fabrica el nodo de una sola entrada/salida con etiqueta de color: lo usan
- * `action` y `blocker` (solo titulo) y los tres estados de un arreglo en curso,
- * `error`, `testing` y `ok`, que ademas llevan una lista de detalles (donde se
+ * `action` y `blocker` (solo titulo) y los estados de un cambio en curso,
+ * `mejora`, `error`, `testing` y `ok`, que ademas llevan una lista de detalles (donde se
  * detecto, que se esta probando, como se arreglo).
  *
  * Cambiar el tipo de un nodo conserva titulo y detalles, asi que el mismo nodo
