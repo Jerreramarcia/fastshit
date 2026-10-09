@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import LinkedText from "./LinkedText";
 
 interface Props {
   value: string;
@@ -32,7 +33,9 @@ export default function InlineTitle({ value, placeholder, autoFocus, readOnly, o
 
   if (readOnly) {
     return (
-      <div style={{ color: value ? "var(--ink)" : "var(--ink-soft)", ...style }}>{value || placeholder}</div>
+      <div style={{ color: value ? "var(--ink)" : "var(--ink-soft)", ...style }}>
+        {value ? <LinkedText text={value} /> : placeholder}
+      </div>
     );
   }
 

@@ -1,5 +1,5 @@
 import type { Edge, Node } from "reactflow";
-import { hasItems, type ExportedBundle, type NodeKind } from "./graphTypes";
+import { hasItems, type ExportedBundle, type LinkRule, type NodeKind } from "./graphTypes";
 import { toExportedSheet } from "./exportDoc";
 
 export interface Sheet {
@@ -7,6 +7,7 @@ export interface Sheet {
   name: string;
   nodes: Node[];
   edges: Edge[];
+  links?: LinkRule[];
 }
 
 /** Bundle exportado -> estado interno del canvas. Lo usan importar y el visor. */
@@ -30,6 +31,7 @@ export function bundleToSheets(bundle: ExportedBundle): Sheet[] {
       target: e.target,
       sourceHandle: e.sourceHandle,
     })),
+    ...(s.links ? { links: s.links } : {}),
   }));
 }
 

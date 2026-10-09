@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import LinkedText from "./LinkedText";
 
 interface Props {
   items: string[];
@@ -99,7 +100,9 @@ export default function ItemList({ items, placeholder, color, bg, onChange, sele
             {i + 1}
           </span>
           {readOnly ? (
-            <span style={{ flex: 1, fontSize: 12, color: "var(--ink)", minWidth: 0 }}>{it}</span>
+            <span style={{ flex: 1, fontSize: 12, color: "var(--ink)", minWidth: 0 }}>
+              <LinkedText text={it} />
+            </span>
           ) : (
             <input
               ref={(el) => {

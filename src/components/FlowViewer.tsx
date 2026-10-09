@@ -8,6 +8,7 @@ import PageNode from "./nodes/PageNode";
 import { bundleToSheets, type Sheet } from "../lib/bundle";
 import { decodeBundle, fetchLiveBundle, type ShareTarget } from "../lib/share";
 import { KIND_LIST } from "../lib/nodeKinds";
+import { LinkRulesContext } from "../lib/links";
 import { isStatusKind, type NodeKind } from "../lib/graphTypes";
 
 /** Cada cuanto se vuelve a leer una sesion en vivo. */
@@ -62,21 +63,23 @@ function ViewerCanvas({ sheet }: { sheet: Sheet }) {
   );
 
   return (
-    <ReactFlow
-      nodes={nodes}
-      edges={sheet.edges}
-      nodeTypes={nodeTypes}
-      edgeTypes={edgeTypes}
-      nodesDraggable={false}
-      nodesConnectable={false}
-      elementsSelectable={false}
-      deleteKeyCode={null}
-      defaultEdgeOptions={{ type: "snappedStep", style: { stroke: "#8b97a3", strokeWidth: 1.6 } }}
-      fitView
-    >
-      <Background color="#c3cac9" gap={18} size={1.4} />
-      <Controls showInteractive={false} />
-    </ReactFlow>
+    <LinkRulesContext.Provider value={sheet.links ?? []}>
+      <ReactFlow
+        nodes={nodes}
+        edges={sheet.edges}
+        nodeTypes={nodeTypes}
+        edgeTypes={edgeTypes}
+        nodesDraggable={false}
+        nodesConnectable={false}
+        elementsSelectable={false}
+        deleteKeyCode={null}
+        defaultEdgeOptions={{ type: "snappedStep", style: { stroke: "#8b97a3", strokeWidth: 1.6 } }}
+        fitView
+      >
+        <Background color="#c3cac9" gap={18} size={1.4} />
+        <Controls showInteractive={false} />
+      </ReactFlow>
+    </LinkRulesContext.Provider>
   );
 }
 

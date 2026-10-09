@@ -46,6 +46,13 @@ export interface ExportedSheet {
   name: string;
   nodes: ExportedNode[];
   edges: ExportedEdge[];
+  links?: LinkRule[];
+}
+
+/** Convierte en enlace el texto que casa con `pattern`; en `url`, `$0`, `$1`... son la coincidencia y sus grupos. */
+export interface LinkRule {
+  pattern: string;
+  url: string;
 }
 
 export interface ExportedBundle {

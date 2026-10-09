@@ -1,8 +1,14 @@
 import type { Edge, Node } from "reactflow";
-import { hasItems, type Branch, type ExportedBundle, type ExportedSheet, type NodeKind } from "./graphTypes";
+import { hasItems, type Branch, type ExportedBundle, type ExportedSheet, type LinkRule, type NodeKind } from "./graphTypes";
 import { KIND_SPECS } from "./nodeKinds";
 
-export function toExportedSheet(sheet: { id: string; name: string; nodes: Node[]; edges: Edge[] }): ExportedSheet {
+export function toExportedSheet(sheet: {
+  id: string;
+  name: string;
+  nodes: Node[];
+  edges: Edge[];
+  links?: LinkRule[];
+}): ExportedSheet {
   return {
     id: sheet.id,
     name: sheet.name,
@@ -22,6 +28,7 @@ export function toExportedSheet(sheet: { id: string; name: string; nodes: Node[]
       target: e.target,
       sourceHandle: e.sourceHandle,
     })),
+    ...(sheet.links ? { links: sheet.links } : {}),
   };
 }
 
