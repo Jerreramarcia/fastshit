@@ -376,6 +376,7 @@ function FlowCanvasInner() {
       page: PageNode,
       mejora: makeStatusNode("mejora"),
       error: makeStatusNode("error"),
+      mr: makeStatusNode("mr"),
       testing: makeStatusNode("testing"),
       ok: makeStatusNode("ok"),
     }),

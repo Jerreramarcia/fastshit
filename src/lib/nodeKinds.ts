@@ -84,6 +84,20 @@ export const KIND_SPECS: Record<NodeKind, KindSpec> = {
     boldTitle: true,
     hint: "algo roto, con el detalle de donde se detecto",
   },
+  mr: {
+    kind: "mr",
+    key: "9",
+    label: "MR",
+    tag: "MR",
+    color: "var(--mr)",
+    bg: "var(--mr-bg)",
+    titlePlaceholder: "repo y cambio propuesto",
+    itemPlaceholder: "repo !N y SHA...",
+    minWidth: 200,
+    maxWidth: 300,
+    boldTitle: true,
+    hint: "merge request creada, pendiente de verificar",
+  },
   testing: {
     kind: "testing",
     key: "6",
@@ -128,7 +142,7 @@ export const KIND_SPECS: Record<NodeKind, KindSpec> = {
   },
 };
 
-export const KIND_ORDER: NodeKind[] = ["action", "blocker", "conditional", "page", "mejora", "error", "testing", "ok"];
+export const KIND_ORDER: NodeKind[] = ["action", "blocker", "conditional", "page", "mejora", "error", "mr", "testing", "ok"];
 
 export const KIND_LIST: KindSpec[] = KIND_ORDER.map((k) => KIND_SPECS[k]);
 
