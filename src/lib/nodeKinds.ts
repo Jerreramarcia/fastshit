@@ -140,9 +140,23 @@ export const KIND_SPECS: Record<NodeKind, KindSpec> = {
     boldTitle: true,
     hint: "verificado y cerrado",
   },
+  cierre: {
+    kind: "cierre",
+    key: "0",
+    label: "Cierre",
+    tag: "CIERRE",
+    color: "var(--cierre)",
+    bg: "var(--cierre-bg)",
+    titlePlaceholder: "que se cerro y como",
+    itemPlaceholder: "revision y evidencia...",
+    minWidth: 200,
+    maxWidth: 300,
+    boldTitle: true,
+    hint: "listo por revision, sin tester",
+  },
 };
 
-export const KIND_ORDER: NodeKind[] = ["action", "blocker", "conditional", "page", "mejora", "error", "mr", "testing", "ok"];
+export const KIND_ORDER: NodeKind[] = ["action", "blocker", "conditional", "page", "mejora", "error", "mr", "testing", "ok", "cierre"];
 
 export const KIND_LIST: KindSpec[] = KIND_ORDER.map((k) => KIND_SPECS[k]);
 

@@ -379,6 +379,7 @@ function FlowCanvasInner() {
       mr: makeStatusNode("mr"),
       testing: makeStatusNode("testing"),
       ok: makeStatusNode("ok"),
+      cierre: makeStatusNode("cierre"),
     }),
     []
   );
