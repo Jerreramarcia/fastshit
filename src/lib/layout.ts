@@ -125,6 +125,41 @@ function alignStraightChains(
   return centers;
 }
 
+/**
+ * Las flechas que cierran un ciclo, hallando el ciclo con un recorrido que parte del inicio.
+ * Se dejan fuera del calculo (se siguen dibujando) para que dagre no elija por su cuenta cual
+ * invertir: con el greedy, un ciclo que vuelve al inicio podia dejar otro nodo como cabeza.
+ */
+function backEdges(nodes: Node[], edges: Edge[], rootId: string | undefined): Set<string> {
+  const outgoing = new Map<string, Edge[]>();
+  const hasIncoming = new Set<string>();
+  for (const e of edges) {
+    if (!outgoing.has(e.source)) outgoing.set(e.source, []);
+    outgoing.get(e.source)!.push(e);
+    hasIncoming.add(e.target);
+  }
+  const back = new Set<string>();
+  const state = new Map<string, "open" | "done">();
+
+  function visit(id: string) {
+    state.set(id, "open");
+    for (const e of outgoing.get(id) ?? []) {
+      const s = state.get(e.target);
+      if (s === "open") back.add(e.id);
+      else if (s === undefined) visit(e.target);
+    }
+    state.set(id, "done");
+  }
+
+  const starts = [
+    ...(rootId ? [rootId] : []),
+    ...nodes.filter((n) => !hasIncoming.has(n.id)).map((n) => n.id),
+    ...nodes.map((n) => n.id),
+  ];
+  for (const id of starts) if (!state.has(id)) visit(id);
+  return back;
+}
+
 export function layoutNodes(nodes: Node[], edges: Edge[], mode: LayoutMode = "horizontal"): Node[] {
   const { rankdir, nodesep, ranksep } = MODE_CONFIG[mode];
   const g = new dagre.graphlib.Graph();
@@ -143,7 +178,8 @@ export function layoutNodes(nodes: Node[], edges: Edge[], mode: LayoutMode = "ho
   for (const n of ordered) {
     g.setNode(n.id, sizes.get(n.id)!);
   }
-  const layoutEdges = edges.filter((e) => e.target !== rootId);
+  const cycleEdges = backEdges(nodes, edges, rootId);
+  const layoutEdges = edges.filter((e) => e.target !== rootId && !cycleEdges.has(e.id));
   for (const e of layoutEdges) {
     if (g.hasNode(e.source) && g.hasNode(e.target)) {
       g.setEdge(e.source, e.target);
