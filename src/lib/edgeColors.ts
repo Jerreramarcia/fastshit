@@ -34,7 +34,10 @@ export function computeEdgeColors(nodes: Node[], edges: Edge[]): Record<string, 
   let paletteIdx = 0;
   const nextColor = () => THREAD_COLORS[paletteIdx++ % THREAD_COLORS.length];
 
-  const roots = nodes.filter((n) => (incomingCount.get(n.id) ?? 0) === 0);
+  // El inicio marcado a mano arranca el primer hilo aunque algun ciclo le llegue una flecha.
+  const roots = nodes
+    .filter((n) => n.data?.root || (incomingCount.get(n.id) ?? 0) === 0)
+    .sort((a, b) => Number(!!b.data?.root) - Number(!!a.data?.root));
   const queue: { nodeId: string; color: string | null }[] = roots.map((n) => ({ nodeId: n.id, color: null }));
   const visitedNodes = new Set<string>();
 

@@ -22,6 +22,7 @@ export function bundleToSheets(bundle: ExportedBundle): Sheet[] {
       data: {
         label: n.label,
         ...(n.branches ? { branches: n.branches } : {}),
+        ...(n.root ? { root: true } : {}),
         ...(hasItems(n.type as NodeKind) ? { items: n.items ?? [] } : {}),
       },
     })),

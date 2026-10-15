@@ -368,6 +368,30 @@ function FlowCanvasInner() {
     window.setTimeout(() => setLayoutAnimating(false), 400);
   }
 
+  /**
+   * Marca el nodo seleccionado como inicio de la capa (y se lo quita al anterior), o le quita la
+   * marca si ya la tenia. Solo hay un inicio por capa: es el que "Ordenar" coloca primero.
+   */
+  function toggleRoot() {
+    const sheetId = activeSheet.id;
+    const target = activeSheet.nodes.find((n) => n.selected);
+    if (!target) return;
+    const makeRoot = !target.data?.root;
+    commitNow((prev) =>
+      prev.map((s) =>
+        s.id !== sheetId
+          ? s
+          : {
+              ...s,
+              nodes: s.nodes.map((n) => {
+                const { root: _drop, ...rest } = n.data ?? {};
+                return n.id === target.id && makeRoot ? { ...n, data: { ...rest, root: true } } : { ...n, data: rest };
+              }),
+            }
+      )
+    );
+  }
+
   const nodeTypes = useMemo(
     () => ({
       action: makeStatusNode("action"),
@@ -440,7 +464,10 @@ function FlowCanvasInner() {
     return { ...node, data };
   }
 
-  const displayNodes = activeSheet.nodes.map((n) => withCallbacks(activeSheet.id, n));
+  const displayNodes = activeSheet.nodes.map((n) => {
+    const node = withCallbacks(activeSheet.id, n);
+    return n.data?.root ? { ...node, className: "is-root" } : node;
+  });
 
   const displayEdges = useMemo(() => {
     if (!colorEdgesEnabled) return activeSheet.edges;
@@ -665,6 +692,7 @@ function FlowCanvasInner() {
         onAutoLayout={autoLayout}
         colorEdgesEnabled={colorEdgesEnabled}
         onToggleColorEdges={toggleColorEdges}
+        onToggleRoot={toggleRoot}
         onShare={() => setShareOpen(true)}
         shareStatus={
           liveSession

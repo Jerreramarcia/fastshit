@@ -133,10 +133,18 @@ export function layoutNodes(nodes: Node[], edges: Edge[], mode: LayoutMode = "ho
 
   const sizes = new Map(nodes.map((n) => [n.id, measureNode(n)]));
 
-  for (const n of nodes) {
+  // El inicio marcado a mano manda; sin marca, el primer nodo creado que ninguna flecha alcanza.
+  const targets = new Set(edges.map((e) => e.target));
+  const rootId = (nodes.find((n) => n.data?.root) ?? nodes.find((n) => !targets.has(n.id)))?.id;
+
+  // dagre desempata por orden de insercion, asi que el inicio entra primero. Y sin flechas que
+  // lleguen a el, un ciclo no puede darle la vuelta al arranque y mandarlo al final del flujo.
+  const ordered = rootId ? [nodes.find((n) => n.id === rootId)!, ...nodes.filter((n) => n.id !== rootId)] : nodes;
+  for (const n of ordered) {
     g.setNode(n.id, sizes.get(n.id)!);
   }
-  for (const e of edges) {
+  const layoutEdges = edges.filter((e) => e.target !== rootId);
+  for (const e of layoutEdges) {
     if (g.hasNode(e.source) && g.hasNode(e.target)) {
       g.setEdge(e.source, e.target);
     }
@@ -145,7 +153,7 @@ export function layoutNodes(nodes: Node[], edges: Edge[], mode: LayoutMode = "ho
   dagre.layout(g);
 
   const crossAxis = rankdir === "LR" ? "y" : "x";
-  const alignedCenters = alignStraightChains(g, nodes, edges, crossAxis);
+  const alignedCenters = alignStraightChains(g, nodes, layoutEdges, crossAxis);
 
   return nodes.map((n) => {
     const pos = g.node(n.id);

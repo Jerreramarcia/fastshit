@@ -21,6 +21,7 @@ export function toExportedSheet(sheet: {
       items: hasItems(n.type as NodeKind)
         ? (n.data?.items as string[] | undefined)?.filter((i) => i.trim() !== "")
         : undefined,
+      ...(n.data?.root ? { root: true as const } : {}),
     })),
     edges: sheet.edges.map((e) => ({
       id: e.id,

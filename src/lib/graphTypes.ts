@@ -23,6 +23,8 @@ export interface FlowNodeData {
   label: string;
   branches?: Branch[];
   items?: string[];
+  /** Punto de partida del flujo: el que "Ordenar" coloca primero. Como mucho uno por capa. */
+  root?: boolean;
 }
 
 export interface ExportedNode {
@@ -32,6 +34,7 @@ export interface ExportedNode {
   position: { x: number; y: number };
   branches?: Branch[];
   items?: string[];
+  root?: true;
 }
 
 export interface ExportedEdge {

@@ -12,6 +12,20 @@ import { LinkRulesContext } from "../lib/links";
 import { isStatusKind, STATUS_KINDS, type NodeKind } from "../lib/graphTypes";
 import { chainEnds, filterByStatus } from "../lib/statusFilter";
 import StatusFilterButton from "./StatusFilterButton";
+import LayoutMenu from "./LayoutMenu";
+import { layoutNodes, type LayoutMode } from "../lib/layout";
+import { computeEdgeColors } from "../lib/edgeColors";
+
+// Misma clave que el editor: quien activa los colores alli los ve tambien en lo que le comparten.
+const COLOR_EDGES_STORAGE_KEY = "fastshit.colorEdgesEnabled";
+
+function readColorEdges(): boolean {
+  try {
+    return window.localStorage.getItem(COLOR_EDGES_STORAGE_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
 
 /** Cada cuanto se vuelve a leer una sesion en vivo. */
 const POLL_MS = 15000;
@@ -63,7 +77,7 @@ function statusSummary(sheets: Sheet[]): { kind: NodeKind; count: number }[] {
   return KIND_LIST.filter((s) => counts.has(s.kind)).map((s) => ({ kind: s.kind, count: counts.get(s.kind)! }));
 }
 
-function ViewerCanvas({ sheet }: { sheet: Sheet }) {
+function ViewerCanvas({ sheet, colorEdges }: { sheet: Sheet; colorEdges: boolean }) {
   const nodeTypes = useMemo(
     () => ({
       action: makeStatusNode("action"),
@@ -86,15 +100,24 @@ function ViewerCanvas({ sheet }: { sheet: Sheet }) {
       sheet.nodes.map((n) => ({
         ...n,
         data: { ...n.data, readOnly: true, onLabelChange: noop, onItemsChange: noop },
+        ...(n.data?.root ? { className: "is-root" } : {}),
       })),
     [sheet.nodes]
   );
+
+  const edges = useMemo(() => {
+    if (!colorEdges) return sheet.edges;
+    const colors = computeEdgeColors(sheet.nodes, sheet.edges);
+    return sheet.edges.map((e) =>
+      colors[e.id] ? { ...e, style: { ...e.style, stroke: colors[e.id], strokeWidth: 2 } } : e
+    );
+  }, [sheet.nodes, sheet.edges, colorEdges]);
 
   return (
     <LinkRulesContext.Provider value={sheet.links ?? []}>
       <ReactFlow
         nodes={nodes}
-        edges={sheet.edges}
+        edges={edges}
         nodeTypes={nodeTypes}
         edgeTypes={edgeTypes}
         nodesDraggable={false}
@@ -120,6 +143,9 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
   const [refreshing, setRefreshing] = useState(false);
   const [autoRefresh, setAutoRefresh] = useState(true);
   const [shownKinds, setShownKinds] = useState(readFilterFromHash);
+  // Solo vive en este navegador: quien mira reordena o colorea sin tocar lo que compartio el autor.
+  const [layoutMode, setLayoutMode] = useState<LayoutMode | null>(null);
+  const [colorEdges, setColorEdges] = useState(readColorEdges);
   // Hash del ultimo bundle visto: evita repintar cuando el gist no cambio.
   const signatureRef = useRef<string>("");
 
@@ -175,6 +201,20 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
     () => (activeSheet && filtering ? filterByStatus(activeSheet, shownKinds) : activeSheet),
     [activeSheet, filtering, shownKinds]
   );
+  const arrangedSheet = useMemo(
+    () => (shownSheet && layoutMode ? { ...shownSheet, nodes: layoutNodes(shownSheet.nodes, shownSheet.edges, layoutMode) } : shownSheet),
+    [shownSheet, layoutMode]
+  );
+  const toggleColorEdges = () => {
+    setColorEdges((on) => {
+      try {
+        window.localStorage.setItem(COLOR_EDGES_STORAGE_KEY, on ? "0" : "1");
+      } catch {
+        // Sin almacenamiento solo se pierde recordar la eleccion.
+      }
+      return !on;
+    });
+  };
   const chainCounts = useMemo(() => {
     const counts = new Map<NodeKind, number>();
     for (const n of activeSheet ? chainEnds(activeSheet) : []) {
@@ -196,7 +236,7 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
     );
   }
 
-  if (!activeSheet || !shownSheet) {
+  if (!activeSheet || !arrangedSheet) {
     return <div style={{ padding: 32, color: "var(--ink-soft)" }}>Cargando flujo compartido...</div>;
   }
 
@@ -254,6 +294,23 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
         )}
 
         <span style={{ flex: 1 }} />
+
+        <LayoutMenu onPick={setLayoutMode} />
+        <button
+          onClick={toggleColorEdges}
+          title="Colorear cada hilo de cables con un color distinto"
+          style={{
+            padding: "6px 12px",
+            border: `1px solid ${colorEdges ? "var(--ink)" : "var(--line)"}`,
+            borderRadius: 6,
+            background: colorEdges ? "var(--ink)" : "var(--surface)",
+            color: colorEdges ? "var(--surface)" : "var(--ink)",
+            cursor: "pointer",
+            fontSize: 13,
+          }}
+        >
+          Colorear cables
+        </button>
 
         {isLive && (
           <>
@@ -330,8 +387,8 @@ export default function FlowViewer({ target }: { target: ShareTarget }) {
       )}
 
       <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
-        <ReactFlowProvider key={`${activeSheet.id}:${[...shownKinds].sort().join(",")}`}>
-          <ViewerCanvas sheet={shownSheet} />
+        <ReactFlowProvider key={`${activeSheet.id}:${[...shownKinds].sort().join(",")}:${layoutMode ?? ""}`}>
+          <ViewerCanvas sheet={arrangedSheet} colorEdges={colorEdges} />
         </ReactFlowProvider>
         {chainCounts.size > 0 && (
           <StatusFilterButton selected={shownKinds} counts={chainCounts} onChange={changeFilter} />
